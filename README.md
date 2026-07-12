@@ -1,4 +1,4 @@
-# 🛡️ SecureCode-Agent: LangChain 기반 지능형 보안 점검 시스템
+# 🛡️ SecureCode-Agent: LangGraph 기반 지능형 보안 점검 시스템
 
 ## 1. 서비스 개요 및 시나리오
 'SecureCode-Agent'는 개발자가 작성한 소스코드의 보안 취약점을 자동으로 분석하고, KISA 개발보안 가이드 및 OWASP Top 10 기준에 따라 안전한 가이드를 제공하는 지능형 어시스턴트입니다.
