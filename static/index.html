@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 소스코드 보안 분석기 - SAST Guard Agent</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #161c2d;
+            --bg-sidebar: #0f1322;
+            --border-color: #222c44;
+            --border-hover: #313f62;
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dark: #64748b;
+            
+            --color-primary: #3b82f6;
+            --color-primary-hover: #2563eb;
+            --color-primary-glow: rgba(59, 130, 246, 0.15);
+            
+            --color-high: #ef4444;
+            --color-high-bg: rgba(239, 68, 68, 0.08);
+            --color-high-border: rgba(239, 68, 68, 0.3);
+            
+            --color-medium: #f59e0b;
+            --color-medium-bg: rgba(245, 158, 11, 0.08);
+            --color-medium-border: rgba(245, 158, 11, 0.3);
+            
+            --color-low: #10b981;
+            --color-low-bg: rgba(16, 185, 129, 0.08);
+            --color-low-border: rgba(16, 185, 129, 0.3);
+            
+            --color-safe: #10b981;
+            --color-safe-bg: rgba(16, 185, 129, 0.08);
+            --color-safe-border: rgba(16, 185, 129, 0.3);
+            
+            --sidebar-width: 320px;
+            --transition-speed: 0.25s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* App Container Layout */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            z-index: 100;
+            transition: transform var(--transition-speed) ease;
+        }
+
+        .brand {
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .brand-icon {
+            color: var(--color-primary);
+            filter: drop-shadow(0 0 8px var(--color-primary-glow));
+        }
+
+        .brand-title {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-main);
+        }
+
+        .brand-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-panel {
+            padding: 16px 24px;
+            background-color: rgba(15, 25, 48, 0.5);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--color-safe);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .status-dot.pulsing::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: var(--color-safe);
+            animation: pulse-ring 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.9); opacity: 1; }
+            100% { transform: scale(2.2); opacity: 0; }
+        }
+
+        .sidebar-scroll {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .sidebar-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .guide-box {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        .example-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .example-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 10px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .example-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-main);
+            background-color: rgba(255, 255, 255, 0.02);
+            transform: translateY(-1px);
+        }
+
+        .example-btn svg {
+            color: var(--color-primary);
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-dark);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Main Content Styling */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: var(--bg-main);
+            position: relative;
+        }
+
+        /* Topbar Header */
+        .topbar {
+            height: 64px;
+            background-color: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 90;
+        }
+
+        .topbar-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-clear {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-clear:hover {
+            color: var(--color-high);
+            border-color: rgba(239, 68, 68, 0.4);
+            background-color: rgba(239, 68, 68, 0.05);
+        }
+
+        .menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        /* Chat / Analysis Area */
+        .chat-wrapper {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chat-wrapper::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 6px;
+        }
+
+        /* Welcome screen when chat is empty */
+        .welcome-screen {
+            max-width: 600px;
+            margin: auto;
+            text-align: center;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .welcome-icon-container {
+            width: 64px;
+            height: 64px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            color: var(--color-primary);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .welcome-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .welcome-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .welcome-features {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .feature-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            border-radius: 10px;
+            display: flex;
+            gap: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .feature-card-icon {
+            color: var(--color-primary);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .feature-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .feature-card-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Chat bubbles */
+        .msg-row {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            animation: slide-up 0.3s ease-out;
+        }
+
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* User input container style */
+        .user-msg-container {
+            background: #090d16;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+            align-self: flex-end;
+            max-width: 85%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            margin-bottom: 24px;
+        }
+
+        .user-msg-header {
+            background-color: #141b2e;
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .user-msg-body {
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #e2e8f0;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Agent simple response message */
+        .agent-text-container {
+            align-self: flex-start;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            max-width: 85%;
+            line-height: 1.6;
+            font-size: 14px;
+            color: #e2e8f0;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* System Warning Banner (for Guardrail block) */
+        .system-warning-card {
+            border: 1px solid #ef4444;
+            background-color: rgba(239, 68, 68, 0.05);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            color: #fca5a5;
+        }
+
+        .system-warning-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .system-warning-body {
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Security Report Box Styling */
+        .report-card {
+            align-self: flex-start;
+            width: 100%;
+            max-width: 900px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 28px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            border-left: 6px solid var(--border-color);
+        }
+
+        .report-card.High { border-left-color: var(--color-high); }
+        .report-card.Medium { border-left-color: var(--color-medium); }
+        .report-card.Low { border-left-color: var(--color-low); }
+        .report-card.Safe { border-left-color: var(--color-safe); }
+
+        .report-header {
+            padding: 18px 24px;
+            background-color: rgba(255, 255, 255, 0.01);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .report-title-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .report-card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .risk-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .risk-badge.High {
+            background-color: var(--color-high-bg);
+            border: 1px solid var(--color-high-border);
+            color: var(--color-high);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.1);
+        }
+
+        .risk-badge.Medium {
+            background-color: var(--color-medium-bg);
+            border: 1px solid var(--color-medium-border);
+            color: var(--color-medium);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
+        }
+
+        .risk-badge.Low {
+            background-color: var(--color-low-bg);
+            border: 1px solid var(--color-low-border);
+            color: var(--color-low);
+        }
+
+        .risk-badge.Safe {
+            background-color: var(--color-safe-bg);
+            border: 1px solid var(--color-safe-border);
+            color: var(--color-safe);
+        }
+
+        .report-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .report-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .report-section-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .report-desc-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #cbd5e1;
+            background-color: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        /* macOS Style Code Window */
+        .code-window {
+            background-color: #060913;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        }
+
+        .code-window-header {
+            background-color: #0f1423;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-window-dots {
+            display: flex;
+            gap: 6px;
+            margin-right: 16px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .dot.red { background-color: #ef4444; }
+        .dot.yellow { background-color: #f59e0b; }
+        .dot.green { background-color: #10b981; }
+
+        .code-window-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            flex-grow: 1;
+        }
+
+        .btn-copy {
+            background-color: #1e293b;
+            color: #cbd5e1;
+            border: 1px solid #334155;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-copy:hover {
+            background-color: #334155;
+            color: var(--text-main);
+        }
+
+        .code-pre {
+            padding: 18px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #38bdf8;
+        }
+
+        /* Loading Indicator inside Chat Area */
+        .analysis-loader {
+            align-self: flex-start;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 18px 24px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            animation: pulse-border 2s infinite ease-in-out;
+            margin-bottom: 24px;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: var(--border-color); }
+            50% { border-color: var(--color-primary); }
+        }
+
+        .loader-layout {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .loader-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(59, 130, 246, 0.1);
+            border-top: 3px solid var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 2px;
+        }
+
+        .loader-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Input Area Panel */
+        .input-panel {
+            padding: 24px;
+            background-color: var(--bg-sidebar);
+            border-top: 1px solid var(--border-color);
+            z-index: 80;
+        }
+
+        .input-container {
+            max-width: 1000px;
+            margin: auto;
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px var(--color-primary-glow);
+        }
+
+        #userInput {
+            width: 100%;
+            min-height: 100px;
+            max-height: 300px;
+            background-color: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', 'Inter', monospace;
+            font-size: 13.5px;
+            line-height: 1.5;
+            padding: 10px;
+            resize: vertical;
+        }
+
+        #userInput::placeholder {
+            color: var(--text-dark);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .input-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            padding-top: 8px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+
+        .char-counter {
+            font-size: 11px;
+            color: var(--text-dark);
+        }
+
+        .btn-send {
+            background-color: var(--color-primary);
+            color: var(--text-main);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            background-color: var(--color-primary-hover);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn-send:disabled {
+            background-color: var(--border-color);
+            color: var(--text-dark);
+            cursor: not-allowed;
+        }
+
+        /* Mobile Responsive adjustments */
+        @media (max-width: 900px) {
+            .sidebar {
+                position: absolute;
+                left: 0;
+                top: 0;
+                height: 100%;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.6);
+                z-index: 95;
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">
+                <svg class="brand-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <div>
+                    <h1 class="brand-title">SAST Guard</h1>
+                    <span class="brand-subtitle">Security Analysis Agent</span>
+                </div>
+            </div>
+            
+            <div class="status-panel">
+                <div class="status-indicator">
+                    <span class="status-dot pulsing"></span>
+                    <span class="status-text">에이전트 연결됨 | LangGraph API</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-scroll">
+                <div>
+                    <h3 class="sidebar-section-title">보안 가이드</h3>
+                    <div class="guide-box">
+                        본 시스템은 <b>KISA 소프트웨어 개발보안 가이드</b> 및 <b>OWASP Top 10</b> 수칙을 정밀 점검합니다. 점검하고자 하는 파이썬 소스코드를 직접 입력하거나, 보안 모범 설계 방안을 AI 에이전트에 문의하세요.
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="sidebar-section-title">코드 취약점 테스트 예시</h3>
+                    <div class="example-list">
+                        <button onclick="loadExample('sql')" class="example-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+                                <path d="M3 12A9 3 0 0 0 21 12"></path>
+                            </svg>
+                            SQL Injection 예시
+                        </button>
+                        <button onclick="loadExample('xss')" class="example-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            Cross-Site Scripting (XSS)
+                        </button>
+                        <button onclick="loadExample('cmd')" class="example-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                                <path d="M6 10l3 3-3 3"></path>
+                                <path d="M12 14h6"></path>
+                            </svg>
+                            Command Injection 예시
+                        </button>
+                        <button onclick="loadExample('path')" class="example-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg> Path Traversal 예시
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <span>Core Node: LangGraph</span>
+                <span>Active</span>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Topbar Header -->
+            <header class="topbar">
+                <button class="menu-toggle" id="menuToggle" onclick="toggleSidebar()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="topbar-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    보안 취약점 점검 & 위협 모델링 AI 대시보드
+                </div>
+                <button onclick="clearChat()" class="btn-clear" title="대화 지우기">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    초기화
+                </button>
+            </header>
+
+            <!-- Chat & Result Body -->
+            <div class="chat-wrapper" id="chat-wrapper">
+                <div id="chat-box">
+                    <!-- Welcome Panel (Shown if no messages) -->
+                    <div class="welcome-screen" id="welcome-screen">
+                        <div class="welcome-icon-container">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <h2 class="welcome-title">AI 정적 분석 보안 비서</h2>
+                        <p class="welcome-subtitle">보안 결함이 우려되는 파이썬 소스코드나 라이브러리를 입력하십시오. 인젝션, XSS, 임의 명령어 실행 위협을 탐지하고 즉시 치료 방안을 마련합니다.</p>
+                        
+                        <div class="welcome-features">
+                            <div class="feature-card">
+                                <div class="feature-card-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="feature-card-title">KISA 개발가이드 및 OWASP 표준 통합 검색</h4>
+                                    <p class="feature-card-desc">실시간 벡터 데이터베이스 점검 검색(RAG)을 사용하여 가장 공인되고 전문성 높은 수정 방안을 매칭합니다.</p>
+                                </div>
+                            </div>
+                            <div class="feature-card">
+                                <div class="feature-card-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="feature-card-title">자동 수정 코드 및  remediating 시연</h4>
+                                    <p class="feature-card-desc">보안 조치가 완벽하게 설계된 정형화 소스코드를 별도 시각화 박스로 즉시 확인하고 복사할 수 있습니다.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Console Area -->
+            <div class="input-panel">
+                <div class="input-container">
+                    <textarea id="userInput" placeholder="점검을 의행할 소스코드를 여기에 붙여넣거나, 보안 관련 질문을 던져주세요... (Shift + Enter로 줄바꿈)"></textarea>
+                    <div class="input-actions">
+                        <span class="char-counter" id="charCounter">0 자 입력됨</span>
+                        <button id="sendBtn" onclick="sendMessage()" class="btn-send">
+                            <span>분석 실행</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // [세션 복구] 로컬 스토리지에서 기존 세션 ID가 있는지 확인하고 없으면 새로 생성
+        let sessionId = localStorage.getItem("sast_session_id");
+        if (!sessionId) {
+            sessionId = "session_" + Math.random().toString(36).substring(7);
+            localStorage.setItem("sast_session_id", sessionId);
+        }
+
+        // 페이지 로드 시 히스토리 불러오기
+        window.onload = () => {
+            loadHistory();
+        };
+
+        async function loadHistory() {
+            try {
+                const response = await fetch(`/api/history/${sessionId}`);
+                const data = await response.json();
+                
+                if (data.history && data.history.length > 0) {
+                    // 히스토리가 있으면 웰컴 스크린 제거
+                    const welcomeScreen = document.getElementById("welcome-screen");
+                    if (welcomeScreen) welcomeScreen.remove();
+                    
+                    const chatBox = document.getElementById("chat-box");
+                    data.history.forEach(item => {
+                        if (item.role === "user") {
+                            appendUserMessage(item.content);
+                        } else if (item.role === "ai") {
+                            appendAiMessage(item.content);
+                        } else if (item.role === "report") {
+                            appendReportMessage(item.content);
+                        }
+                    });
+                    
+                    const chatWrapper = document.getElementById("chat-wrapper");
+                    chatWrapper.scrollTo({ top: chatWrapper.scrollHeight });
+                }
+            } catch (err) {
+                console.error("히스토리 로딩 실패:", err);
+            }
+        }
+
+        // 메시지 추가를 위한 유틸리티 함수들 (sendMessage 로직에서 분리)
+        function appendUserMessage(content) {
+            const chatBox = document.getElementById("chat-box");
+            const html = `
+                <div class="msg-row">
+                    <div class="user-msg-container">
+                        <div class="user-msg-header">
+                            <span>📄 input_source_code.py</span>
+                            <span>Python</span>
+                        </div>
+                        <div class="user-msg-body">${escapeHtml(content)}</div>
+                    </div>
+                </div>
+            `;
+            chatBox.innerHTML += html;
+        }
+
+        function appendAiMessage(content) {
+            const chatBox = document.getElementById("chat-box");
+            const html = `
+                <div class="msg-row">
+                    <div class="agent-text-container">
+                        ${formatMessageText(content)}
+                    </div>
+                </div>
+            `;
+            chatBox.innerHTML += html;
+        }
+
+        function appendReportMessage(r) {
+            const chatBox = document.getElementById("chat-box");
+            const risk = r.risk_level || "Safe";
+            let safetyTitle = "🛡️ 보안 취약점 점검 보고서";
+            if (risk === "High") safetyTitle = "🚨 심각한 보안 취약점 탐지됨";
+            else if (risk === "Medium") safetyTitle = "⚠️ 잠재적 보안 취약점 탐지됨";
+            else if (risk === "Low") safetyTitle = "ℹ️ 경미한 보안 이슈 발견됨";
+            else if (risk === "Safe") safetyTitle = "✅ 소스코드 안전 확인";
+
+            const reportId = "code-remediation-" + Date.now() + Math.random().toString(36).substring(7);
+            const html = `
+                <div class="msg-row">
+                    <div class="report-card ${risk}">
+                        <div class="report-header">
+                            <div class="report-title-container">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                                <span class="report-card-title">${safetyTitle}</span>
+                            </div>
+                            <span class="risk-badge ${risk}">
+                                <span style="width:6px; height:6px; border-radius:50%; background-color:currentColor"></span>
+                                위험도: ${risk}
+                            </span>
+                        </div>
+                        <div class="report-body">
+                            <div class="report-section">
+                                <div class="report-section-header">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                    상세 분석 보고 및 조치 근거
+                                </div>
+                                <div class="report-desc-text">${formatMessageText(r.description)}</div>
+                            </div>
+                            ${r.fixed_code ? `
+                            <div class="report-section">
+                                <div class="report-section-header">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="16 18 22 12 16 6"></polyline>
+                                        <polyline points="8 6 2 12 8 18"></polyline>
+                                    </svg>
+                                    보안 모범 제안 소스코드
+                                </div>
+                                <div class="code-window">
+                                    <div class="code-window-header">
+                                        <div class="code-window-dots">
+                                            <span class="dot red"></span>
+                                            <span class="dot yellow"></span>
+                                            <span class="dot green"></span>
+                                        </div>
+                                        <div class="code-window-title">secure_remediation.py</div>
+                                        <button class="btn-copy" onclick="copyToClipboard(this, '${reportId}')">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                            </svg> 복사
+                                        </button>
+                                    </div>
+                                    <pre class="code-pre" id="${reportId}"><code>${escapeHtml(r.fixed_code)}</code></pre>
+                                </div>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatBox.innerHTML += html;
+        }
+
+        // Sidebar responsive toggle
+        function toggleSidebar() {
+            const sidebar = document.getElementById("sidebar");
+            const overlay = document.getElementById("sidebarOverlay");
+            sidebar.classList.toggle("active");
+            overlay.classList.toggle("active");
+        }
+
+        // Example code loader
+        const EXAMPLES = {
+            sql: `def get_user_data(username, password):
+    # SQL Injection 취약점 코드 예시 (KISA 가이드 위반)
+    # 외부 입력 변수가 SQL 구문에 문자열 형태로 직접 결합되어 취약함
+    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+    cursor.execute(query)
+    return cursor.fetchall()`,
+            
+            xss: `def render_welcome_page(user_input_name):
+    # Cross-Site Scripting (XSS) 취약점 코드 예시
+    # 사용자의 입력값을 그대로 HTML 본문에 작성하여 악성 스크립트 실행 유도 가능
+    html_template = f"""
+    <html>
+        <body>
+            <h1>환영합니다, {user_input_name}님!</h1>
+        </body>
+    </html>
+    """
+    return html_template`,
+            
+            cmd: `import os
+
+def ping_target_host(ip_address):
+    # Command Injection 취약점 코드 예시
+    # IP 주소 끝에 '; rm -rf /' 등 세미콜론과 악성 커맨드가 들어올 경우 그대로 실행됨
+    command = "ping -c 1 " + ip_address
+    os.system(command)
+    return "Ping 명령어 전송 완료"`,
+
+            path: `def read_user_profile(file_name):
+    # Path Traversal 취약점 코드 예시
+    # 'file_name'에 '../../etc/passwd' 와 같은 경로 제어 문자가 결합될 경우 임의 파일 탈취 가능
+    filepath = "/app/user_profiles/" + file_name
+    with open(filepath, "r") as profile_file:
+        return profile_file.read()`
+        };
+
+        function loadExample(key) {
+            const code = EXAMPLES[key];
+            if (!code) return;
+            const textarea = document.getElementById("userInput");
+            textarea.value = code;
+            textarea.focus();
+            
+            // Dispatch input event to refresh char counter
+            textarea.dispatchEvent(new Event('input'));
+            
+            // Auto close sidebar on mobile
+            const sidebar = document.getElementById("sidebar");
+            if (sidebar.classList.contains("active")) {
+                toggleSidebar();
+            }
+        }
+
+        // Auto-handle Enter and Shift+Enter key
+        const userInput = document.getElementById("userInput");
+        userInput.addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault(); // Prevent standard enter key newline
+                sendMessage();
+            }
+        });
+
+        // Live Character counter
+        userInput.addEventListener("input", function() {
+            const count = userInput.value.length;
+            document.getElementById("charCounter").innerText = `${count.toLocaleString()} 자 입력됨`;
+        });
+
+        // Initialize chat reset
+        function clearChat() {
+            if (confirm("정말로 모든 대화 내역 및 분석 대시보드를 초기화하시겠습니까?")) {
+                // [세션 복구] 새 세션 ID 생성 및 저장
+                sessionId = "session_" + Math.random().toString(36).substring(7);
+                localStorage.setItem("sast_session_id", sessionId);
+
+                const chatBox = document.getElementById("chat-box");
+                chatBox.innerHTML = `
+                    <div class="welcome-screen" id="welcome-screen">
+                        <div class="welcome-icon-container">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <h2 class="welcome-title">AI 정적 분석 보안 비서</h2>
+                        <p class="welcome-subtitle">보안 결함이 우려되는 파이썬 소스코드나 라이브러리를 입력하십시오. 인젝션, XSS, 임의 명령어 실행 위협을 탐지하고 즉시 치료 방안을 마련합니다.</p>
+                        
+                        <div class="welcome-features">
+                            <div class="feature-card">
+                                <div class="feature-card-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="feature-card-title">KISA 개발가이드 및 OWASP 표준 통합 검색</h4>
+                                    <p class="feature-card-desc">실시간 벡터 데이터베이스 점검 검색(RAG)을 사용하여 가장 공인되고 전문성 높은 수정 방안을 매칭합니다.</p>
+                                </div>
+                            </div>
+                            <div class="feature-card">
+                                <div class="feature-card-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="feature-card-title">자동 수정 코드 및 remediating 시연</h4>
+                                    <p class="feature-card-desc">보안 조치가 완벽하게 설계된 정형화 소스코드를 별도 시각화 박스로 즉시 확인하고 복사할 수 있습니다.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                userInput.value = "";
+                document.getElementById("charCounter").innerText = "0 자 입력됨";
+            }
+        }
+
+        // HTML escaping helper
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Format conversational responses beautifully
+        function formatMessageText(text) {
+            if (!text) return "";
+            let formatted = escapeHtml(text);
+            
+            // Check for system block
+            if (text.includes("[시스템 차단]")) {
+                return `
+                    <div class="system-warning-card">
+                        <div class="system-warning-header">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <span>보안 시스템 차단 알림</span>
+                        </div>
+                        <div class="system-warning-body">${formatted}</div>
+                    </div>
+                `;
+            }
+            
+            // 1. Format code blocks (```language ... ```)
+            const codeBlockRegex = /```(?:[a-zA-Z0-9]+)?\n([\s\S]*?)\n```/g;
+            formatted = formatted.replace(codeBlockRegex, (match, code) => {
+                const uniqueId = "code-" + Math.random().toString(36).substring(7);
+                return `
+                    <div class="code-window">
+                        <div class="code-window-header">
+                            <div class="code-window-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <div class="code-window-title">code_snippet.py</div>
+                            <button class="btn-copy" onclick="copyToClipboard(this, '${uniqueId}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg> 복사
+                            </button>
+                        </div>
+                        <pre class="code-pre" id="${uniqueId}"><code>${code}</code></pre>
+                    </div>
+                `;
+            });
+            
+            // 2. Format inline code (`code`)
+            const inlineCodeRegex = /`([^`\n]+)`/g;
+            formatted = formatted.replace(inlineCodeRegex, '<code>$1</code>');
+            
+            // 3. Format line breaks
+            formatted = formatted.replace(/\n/g, '<br>');
+            
+            return formatted;
+        }
+
+        // Copy mechanism
+        function copyToClipboard(button, textId) {
+            const codeElement = document.getElementById(textId);
+            if (!codeElement) return;
+            
+            const textarea = document.createElement("textarea");
+            textarea.value = codeElement.textContent;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand("copy");
+                const originalHtml = button.innerHTML;
+                button.innerHTML = `
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg> 복사 완료
+                `;
+                button.style.backgroundColor = "rgba(16, 185, 129, 0.2)";
+                button.style.borderColor = "#10b981";
+                button.style.color = "#10b981";
+                setTimeout(() => {
+                    button.innerHTML = originalHtml;
+                    button.style.backgroundColor = "";
+                    button.style.borderColor = "";
+                    button.style.color = "";
+                }, 2000);
+            } catch (err) {
+                console.error("복사 오류: ", err);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("userInput").value.trim();
+            if (!input) return;
+
+            const chatBox = document.getElementById("chat-box");
+            const chatWrapper = document.getElementById("chat-wrapper");
+            const sendBtn = document.getElementById("sendBtn");
+            const userInputArea = document.getElementById("userInput");
+
+            // Hide Welcome screen on first message
+            const welcomeScreen = document.getElementById("welcome-screen");
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
+
+            // Append User message (Code Block format)
+            const userMsgHtml = `
+                <div class="msg-row">
+                    <div class="user-msg-container">
+                        <div class="user-msg-header">
+                            <span>📄 input_source_code.py</span>
+                            <span>Python</span>
+                        </div>
+                        <div class="user-msg-body">${escapeHtml(input)}</div>
+                    </div>
+                </div>
+            `;
+            chatBox.innerHTML += userMsgHtml;
+            
+            // Clear textarea and reset counter
+            userInputArea.value = "";
+            document.getElementById("charCounter").innerText = "0 자 입력됨";
+            
+            // Scroll to bottom
+            chatWrapper.scrollTo({ top: chatWrapper.scrollHeight, behavior: 'smooth' });
+
+            // Create and append Loader element
+            const loaderId = "loader-" + Date.now();
+            const loaderHtml = `
+                <div class="msg-row" id="${loaderId}">
+                    <div class="analysis-loader">
+                        <div class="loader-layout">
+                            <div class="loader-spinner"></div>
+                            <div>
+                                <div class="loader-title">AI 보안 가드 분석 진행 중...</div>
+                                <div class="loader-subtitle">AST 구문 분석 및 KISA 보안 표준 점검 데이터 수집 중...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatBox.innerHTML += loaderHtml;
+            chatWrapper.scrollTo({ top: chatWrapper.scrollHeight, behavior: 'smooth' });
+
+            // Disable Send interaction
+            sendBtn.disabled = true;
+            userInputArea.disabled = true;
+
+            try {
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: input, session_id: sessionId })
+                });
+                
+                const result = await response.json();
+
+                // [세션 복구] 서버에서 세션 ID가 갱신되었을 경우 (TTL 만료 등) 동기화
+                if (result.session_id && result.session_id !== sessionId) {
+                    sessionId = result.session_id;
+                    localStorage.setItem("sast_session_id", sessionId);
+                }
+                
+                // Remove loader
+                const loaderElement = document.getElementById(loaderId);
+                if (loaderElement) {
+                    loaderElement.remove();
+                }
+
+                if (result.type === "report") {
+                    const r = result.data;
+                    const risk = r.risk_level || "Safe";
+                    
+                    // Choose header message depending on risk level
+                    let safetyTitle = "🛡️ 보안 취약점 점검 보고서";
+                    if (risk === "High") safetyTitle = "🚨 심각한 보안 취약점 탐지됨";
+                    else if (risk === "Medium") safetyTitle = "⚠️ 잠재적 보안 취약점 탐지됨";
+                    else if (risk === "Low") safetyTitle = "ℹ️ 경미한 보안 이슈 발견됨";
+                    else if (risk === "Safe") safetyTitle = "✅ 소스코드 안전 확인";
+
+                    const reportId = "code-remediation-" + Date.now();
+                    const reportHtml = `
+                        <div class="msg-row">
+                            <div class="report-card ${risk}">
+                                <div class="report-header">
+                                    <div class="report-title-container">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                        </svg>
+                                        <span class="report-card-title">${safetyTitle}</span>
+                                    </div>
+                                    <span class="risk-badge ${risk}">
+                                        <span style="width:6px; height:6px; border-radius:50%; background-color:currentColor"></span>
+                                        위험도: ${risk}
+                                    </span>
+                                </div>
+                                <div class="report-body">
+                                    <div class="report-section">
+                                        <div class="report-section-header">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                            </svg>
+                                            상세 분석 보고 및 조치 근거
+                                        </div>
+                                        <div class="report-desc-text">${formatMessageText(r.description)}</div>
+                                    </div>
+                                    
+                                    ${r.fixed_code ? `
+                                    <div class="report-section">
+                                        <div class="report-section-header">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="16 18 22 12 16 6"></polyline>
+                                                <polyline points="8 6 2 12 8 18"></polyline>
+                                            </svg>
+                                            보안 모범 제안 소스코드
+                                        </div>
+                                        <div class="code-window">
+                                            <div class="code-window-header">
+                                                <div class="code-window-dots">
+                                                    <span class="dot red"></span>
+                                                    <span class="dot yellow"></span>
+                                                    <span class="dot green"></span>
+                                                </div>
+                                                <div class="code-window-title">secure_remediation.py</div>
+                                                <button class="btn-copy" onclick="copyToClipboard(this, '${reportId}')">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                                    </svg> 복사
+                                                </button>
+                                            </div>
+                                            <pre class="code-pre" id="${reportId}"><code>${escapeHtml(r.fixed_code)}</code></pre>
+                                        </div>
+                                    </div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    chatBox.innerHTML += reportHtml;
+                } else {
+                    // Normal text response
+                    const agentTextHtml = `
+                        <div class="msg-row">
+                            <div class="agent-text-container">
+                                ${formatMessageText(result.data)}
+                            </div>
+                        </div>
+                    `;
+                    chatBox.innerHTML += agentTextHtml;
+                }
+            } catch (err) {
+                console.error("서버 연결 실패: ", err);
+                // Remove loader
+                const loaderElement = document.getElementById(loaderId);
+                if (loaderElement) {
+                    loaderElement.remove();
+                }
+                
+                chatBox.innerHTML += `
+                    <div class="msg-row">
+                        <div class="system-warning-card">
+                            <div class="system-warning-header">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                <span>연결 실패 알림</span>
+                            </div>
+                            <div class="system-warning-body">보안 분석 서버와의 연결이 원활하지 않습니다. 로컬 서버(FastAPI)가 정상 가동 중인지 확인해 주세요.</div>
+                        </div>
+                    </div>
+                `;
+            } finally {
+                // Enable inputs
+                sendBtn.disabled = false;
+                userInputArea.disabled = false;
+                userInputArea.focus();
+                
+                // Final scroll adjustments
+                chatWrapper.scrollTo({ top: chatWrapper.scrollHeight, behavior: 'smooth' });
+            }
+        }
+    </script>
+</body>
+</html>
