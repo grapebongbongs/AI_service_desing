@@ -32,11 +32,11 @@
    * **StateGraph:** 대화 흐름을 노드(Node)와 엣지(Edge)로 관리하는 핵심 엔진입니다.
    * **Memory (SqliteSaver):** SQLite를 Checkpointer로 사용하여 사용자의 멀티턴 대화 맥락(Context)을 영구적으로 저장하고 복원합니다.
    * **Middleware (Guardrail):** 프롬프트 인젝션 등 악의적 공격을 최우선으로 차단하는 보안 미들웨어입니다.
-   * **Smart Router (`route\_intent`):** `IntentClassifier`를 통해 사용자의 의도를 분석하고, 일반 챗봇 로직과 코드 분석 로직을 동적으로 분기(Branching)합니다.
+   * **Smart Router (`route\\\_intent`):** `IntentClassifier`를 통해 사용자의 의도를 분석하고, 일반 챗봇 로직과 코드 분석 로직을 동적으로 분기(Branching)합니다.
 4. **외부 도구 연동 계층 (Tool Execution Layer)**
 
    * 에이전트가 ReAct 패턴에 따라 자율적으로 호출하는 3가지 도구입니다.
-   * 정적 코드 분석(`analyze\_code\_ast`), 벡터 DB 검색(`search\_security\_guideline`), NVD 실시간 통신(`search\_cve\_database`).
+   * 정적 코드 분석(`analyze\\\_code\\\_ast`), 벡터 DB 검색(`search\\\_security\\\_guideline`), NVD 실시간 통신(`search\\\_cve\\\_database`).
 5. **데이터 구조화 및 출력 계층 (Data \& Output Layer)**
 
    * **Pydantic (SecurityReport):** LLM의 자유로운 텍스트 출력을 통제하고, 반드시 지정된 JSON 형식(취약점 여부, 등급, 설명, 수정 코드)으로 응답하도록 강제합니다.
@@ -47,51 +47,51 @@
 ```mermaid
 graph TD
     %% 1. 사용자 및 진입점
-    User(\[개발자]) -->|1. ChatRequest| API\[FastAPI]
+    User(\\\[개발자]) -->|1. ChatRequest| API\\\[FastAPI]
     
-    subgraph Phase1 \[Phase 1: FastAPI 세션 및 TTL 관리]
+    subgraph Phase1 \\\[Phase 1: FastAPI 세션 및 TTL 관리]
         API --> TTL{2. TTL 검사}
-        TTL -->|만료 시| NewSession\[새로운 session\_id 발급]
-        TTL -->|유효 시| UpdateTime\[접속 시간 갱신]
-        NewSession --> GraphConfig\[3. Config 객체 생성]
+        TTL -->|만료 시| NewSession\\\[새로운 session\\\_id 발급]
+        TTL -->|유효 시| UpdateTime\\\[접속 시간 갱신]
+        NewSession --> GraphConfig\\\[3. Config 객체 생성]
         UpdateTime --> GraphConfig
     end
     
-    subgraph Phase2 \[Phase 2: LangGraph 에이전트 엔진]
-        GraphConfig --> Invoke\[4. app\_graph.invoke 실행]
-        Invoke --> Memory\[(5. SqliteSaver 히스토리 로드)]
-        Memory --> Guardrail\[6. Guardrail Middleware]
+    subgraph Phase2 \\\[Phase 2: LangGraph 에이전트 엔진]
+        GraphConfig --> Invoke\\\[4. app\\\_graph.invoke 실행]
+        Invoke --> Memory\\\[(5. SqliteSaver 히스토리 로드)]
+        Memory --> Guardrail\\\[6. Guardrail Middleware]
         Guardrail --> GuardCheck{악성 인젝션 포함?}
-        GuardCheck -->|Yes| Block\[시스템 차단 응답]
-        Block --> END\_Node(\[END])
-        GuardCheck -->|No| AgentNode\[7. Agent Node]
-        AgentNode --> Router{8. route\_intent 분기}
-        Router -->|Tool 호출 필요| ActionNode\[9. ToolNode 실행]
+        GuardCheck -->|Yes| Block\\\[시스템 차단 응답]
+        Block --> END\\\_Node(\\\[END])
+        GuardCheck -->|No| AgentNode\\\[7. Agent Node]
+        AgentNode --> Router{8. route\\\_intent 분기}
+        Router -->|Tool 호출 필요| ActionNode\\\[9. ToolNode 실행]
         
-        subgraph Phase3 \[Phase 3: 자율적 데이터 수집]
-            ActionNode --> T1\[search\_security\_guideline]
-            ActionNode --> T2\[analyze\_code\_ast]
-            ActionNode --> T3\[search\_cve\_database]
+        subgraph Phase3 \\\[Phase 3: 자율적 데이터 수집]
+            ActionNode --> T1\\\[search\\\_security\\\_guideline]
+            ActionNode --> T2\\\[analyze\\\_code\\\_ast]
+            ActionNode --> T3\\\[search\\\_cve\\\_database]
         end
         
         T1 --> AgentNode
         T2 --> AgentNode
         T3 --> AgentNode
-        Router -->|코드 분석 요청| ParserNode\[10. Output Parser Node]
-        Router -->|일반 대화 요청| GeneralNode\[10. General Chat Node]
-        ParserNode -->|REPORTSERIALIZED 저장| END\_Node
-        GeneralNode --> END\_Node
+        Router -->|코드 분석 요청| ParserNode\\\[10. Output Parser Node]
+        Router -->|일반 대화 요청| GeneralNode\\\[10. General Chat Node]
+        ParserNode -->|REPORTSERIALIZED 저장| END\\\_Node
+        GeneralNode --> END\\\_Node
     end
     
-    subgraph Phase4 \[Phase 4: 응답 처리 및 반환]
-        END\_Node --> ResponseCheck{11. 응답 타입 확인}
-        ResponseCheck -->|report| JsonReport\[12. JSON 구조화 리포트 반환]
-        ResponseCheck -->|chat| TextChat\[12. 텍스트 대화 반환]
+    subgraph Phase4 \\\[Phase 4: 응답 처리 및 반환]
+        END\\\_Node --> ResponseCheck{11. 응답 타입 확인}
+        ResponseCheck -->|report| JsonReport\\\[12. JSON 구조화 리포트 반환]
+        ResponseCheck -->|chat| TextChat\\\[12. 텍스트 대화 반환]
     end
     
-    JsonReport --> UI\_Render\[13. 화면 렌더링]
-    TextChat --> UI\_Render
-    UI\_Render --> User
+    JsonReport --> UI\\\_Render\\\[13. 화면 렌더링]
+    TextChat --> UI\\\_Render
+    UI\\\_Render --> User
 ```
 
 
@@ -100,37 +100,37 @@ graph TD
 
 ### Phase 1: 시스템 초기화 및 보안 (보안 및 RAG 파이프라인 구성)
 
-* **환경 변수 관리 (`dotenv`)**: `load\_dotenv()`를 사용하여 `.env` 파일에서 `OPENAI\_API\_KEY`를 안전하게 로드합니다. 이는 서비스 배포 시 발생할 수 있는 보안 취약점을 예방합니다.
+* **환경 변수 관리 (`dotenv`)**: `load\\\_dotenv()`를 사용하여 `.env` 파일에서 `OPENAI\\\_API\\\_KEY`를 안전하게 로드합니다. 이는 서비스 배포 시 발생할 수 있는 보안 취약점을 예방합니다.
 * **RAG 파이프라인 구축 (`Chroma`, `WebBaseLoader`, `PyPDFLoader`)**:  에이전트의 환각(Hallucination) 현상을 방지하고 도메인 특화 지식을 제공하기 위해 하이브리드 RAG를 구축했습니다.
 
-  * OWASP 웹 문서와 KISA 보안 가이드(`kisa\_secure\_coding\_guide.pdf`)를 병합 로드한 뒤, `RecursiveCharacterTextSplitter`를 통해 1000자 단위(overlap 200)로 분할하여 `Chroma` 벡터스토어에 인덱싱했습니다.
+  * OWASP 웹 문서와 KISA 보안 가이드(`kisa\\\_secure\\\_coding\\\_guide.pdf`)를 병합 로드한 뒤, `RecursiveCharacterTextSplitter`를 통해 1000자 단위(overlap 200)로 분할하여 `Chroma` 벡터스토어에 인덱싱했습니다.
   * 이를 통해 서비스는 일반적인 지식이 아닌, 최신 보안 표준에 입각한 정확한 근거를 검색하여 답변에 반영합니다.
 
 ### Phase 2: 요청 수신 및 상태 유지 (세션 및 Memory 관리)
 
-* **세션 기반 메모리 연동 (`FastAPI`, `SqliteSaver`)**: 사용자가 프론트엔드에서 질문을 입력하면, FastAPI 엔드포인트에서 고유한 `session\_id`를 발급 또는 식별합니다.
+* **세션 기반 메모리 연동 (`FastAPI`, `SqliteSaver`)**: 사용자가 프론트엔드에서 질문을 입력하면, FastAPI 엔드포인트에서 고유한 `session\\\_id`를 발급 또는 식별합니다.
 
-  * LangGraph의 `SqliteSaver`를 Checkpointer로 사용하여, 이 `session\_id`를 기준으로 SQLite DB에서 과거의 멀티턴(Multi-turn) 대화 맥락을 완벽하게 복원합니다.
-* **자체 TTL(Time-To-Live) 메모리 최적화**: 실제 서비스 운영 시 발생할 수 있는 메모리 누수를 방지하기 위해 `SESSION\_ACCESS\_LOG`를 구현했습니다. 1시간(3600초) 이상 미사용된 세션은 자동으로 만료시키고 새로운 세션으로 리셋하여 서버 리소스를 효율적으로 관리합니다.
+  * LangGraph의 `SqliteSaver`를 Checkpointer로 사용하여, 이 `session\\\_id`를 기준으로 SQLite DB에서 과거의 멀티턴(Multi-turn) 대화 맥락을 완벽하게 복원합니다.
+* **자체 TTL(Time-To-Live) 메모리 최적화**: 실제 서비스 운영 시 발생할 수 있는 메모리 누수를 방지하기 위해 `SESSION\\\_ACCESS\\\_LOG`를 구현했습니다. 1시간(3600초) 이상 미사용된 세션은 자동으로 만료시키고 새로운 세션으로 리셋하여 서버 리소스를 효율적으로 관리합니다.
 
 ### Phase 3: 에이전트 라우팅 및 가드레일 (LangGraph 분기 및 Middleware)
 
-* **운영 안정성을 위한 Middleware (`guardrail\_middleware`)**: LangGraph의 첫 번째 노드로 가드레일을 배치했습니다. 사용자의 입력에 "해킹해줘"와 같은 악의적 프롬프트 인젝션 시도가 감지되면 시스템이 즉각 개입하여 `\[시스템 차단]` 메시지를 반환하고 프로세스를 조기 종료(`END`)시킵니다.
-* **조건부 분기(Conditional Edges) 기반 라우팅 (`route\_intent`)**: 단순 체인(Chain) 구조가 아닌 `StateGraph`를 활용하여, `IntentClassifier`가 사용자의 전체 문맥을 분석합니다.
+* **운영 안정성을 위한 Middleware (`guardrail\\\_middleware`)**: LangGraph의 첫 번째 노드로 가드레일을 배치했습니다. 사용자의 입력에 "해킹해줘"와 같은 악의적 프롬프트 인젝션 시도가 감지되면 시스템이 즉각 개입하여 `\\\[시스템 차단]` 메시지를 반환하고 프로세스를 조기 종료(`END`)시킵니다.
+* **조건부 분기(Conditional Edges) 기반 라우팅 (`route\\\_intent`)**: 단순 체인(Chain) 구조가 아닌 `StateGraph`를 활용하여, `IntentClassifier`가 사용자의 전체 문맥을 분석합니다.
 
-  * 의도가 '코드 분석(analysis)'일 경우 구조화된 리포트를 생성하는 `parser` 노드로 보내고, '단순 대화(general)'일 경우 `general\_chat` 노드로 분기시킵니다. 이 동적 라우팅을 통해 불필요한 연산을 줄이고 응답 속도를 최적화했습니다.
+  * 의도가 '코드 분석(analysis)'일 경우 구조화된 리포트를 생성하는 `parser` 노드로 보내고, '단순 대화(general)'일 경우 `general\\\_chat` 노드로 분기시킵니다. 이 동적 라우팅을 통해 불필요한 연산을 줄이고 응답 속도를 최적화했습니다.
 
 ### Phase 4: 자율적 데이터 수집 (Tool Calling)
 
-* **다중 도구 자율 선택 (`bind\_tools`)**: 에이전트는 분석에 필요한 데이터가 부족할 경우, 시스템에 장착된 3개의 외부 도구 중 최적의 도구를 스스로 판단하여 호출합니다.
+* **다중 도구 자율 선택 (`bind\\\_tools`)**: 에이전트는 분석에 필요한 데이터가 부족할 경우, 시스템에 장착된 3개의 외부 도구 중 최적의 도구를 스스로 판단하여 호출합니다.
 
-  1. `analyze\_code\_ast`: 정규식 및 패턴 매칭을 통해 1차적인 코드 정적 분석을 수행합니다.
-  2. `search\_security\_guideline`: RAG 파이프라인의 Retriever를 호출하여 취약점 방어 기법을 검색합니다.
-  3. `search\_cve\_database`: 실시간으로 NVD 데이터베이스 API에 접근하여 해당 기술 스택의 최신 CVE(알려진 취약점) 정보를 수집합니다. 타임아웃 예외 처리를 통해 API 지연 시에도 서비스가 멈추지 않도록 구성했습니다.
+  1. `analyze\\\_code\\\_ast`: 정규식 및 패턴 매칭을 통해 1차적인 코드 정적 분석을 수행합니다.
+  2. `search\\\_security\\\_guideline`: RAG 파이프라인의 Retriever를 호출하여 취약점 방어 기법을 검색합니다.
+  3. `search\\\_cve\\\_database`: 실시간으로 NVD 데이터베이스 API에 접근하여 해당 기술 스택의 최신 CVE(알려진 취약점) 정보를 수집합니다. 타임아웃 예외 처리를 통해 API 지연 시에도 서비스가 멈추지 않도록 구성했습니다.
 
 ### Phase 5: 응답 구조화 및 데이터 직렬화 (OutputParser)
 
-* **구조화된 출력 (`Pydantic`, `with\_structured\_output`)**: 코드 분석이 완료되면, 에이전트가 자유 형식으로 대답하는 것을 통제하기 위해 `SecurityReport` Pydantic 스키마를 강제합니다.
+* **구조화된 출력 (`Pydantic`, `with\\\_structured\\\_output`)**: 코드 분석이 완료되면, 에이전트가 자유 형식으로 대답하는 것을 통제하기 위해 `SecurityReport` Pydantic 스키마를 강제합니다.
 
   * 이 과정을 통해 취약점 발견 여부(Boolean), 위험도(String), 상세 설명(String), 수정된 코드(String)가 완벽한 JSON 형태로 출력되며, 프론트엔드에서 리포트 UI를 안정적으로 렌더링할 수 있습니다.
 * **데이터 정합성을 위한 직렬화 (`REPORTSERIALIZED`)**: 반환된 JSON 리포트는 화면에 표시됨과 동시에, `REPORTSERIALIZED:`라는 접두사가 붙은 문자열로 변환되어 DB에 저장됩니다. 향후 세션을 복구할 때 이 접두사를 파싱하여 과거 리포트 내역까지 화면에 온전히 복원해 내는 데이터 정합성을 확보했습니다.
@@ -148,8 +148,7 @@ my-project/ (루트 디렉토리)
 ├── .env                <-- API 키 관리 
 ├── main.py             <-- 실행 파일
 ├── agent.py            <-- 에이전트 로직
-
-├── kisa\_secure\_coding\_guide.pd            <-- RAG 검색용 보안 가이드 문서
+├── kisa\\\_secure\\\_coding\\\_guide.pd            <-- RAG 검색용 보안 가이드 문서
 ├── requirements.txt    <-- 의존성 파일
 ├── README.md           <-- 작성한 설명서
 └── static/             <-- 서브 폴더
